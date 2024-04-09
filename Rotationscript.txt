@@ -1,0 +1,73 @@
+#!/bin/bash
+
+while true; do
+
+        #Введем путь до ротируемых логов
+        read -p "Print full path to your logfiles in format /exapmle/your/log -  " LOGPATH
+
+        #Посмотрим, какие лог-файлы занимают больше всего места на файловой системе
+        du -h $LOGPATH/* | sort -hr | head -n 10
+
+        #Выберем шаблон ротируемых логов
+        read -p "Choose the template for rotating logs: exapmle Messages —> print Mes* -  " TEMPLATE
+
+        #Установим количество инстансов для отротированных логов
+        read -p "Enter the number of rotated log instances -  " ROTATE
+
+        #Выберем минимальный размер логов для ротации
+        read -p " Select the size of logs for rotation, example: 100M or 1G -  " SIZE
+
+        #Создать новый лог после ротации старого?
+        read -p " Creating new log file? y/n -  " ANS1
+        if [ $ANS1 == "y" ]; then
+                CREATING="create"
+        else
+                CREATING="nocreate"
+        fi
+
+        #Выводить сообщения об ошибках на экран?
+        read -p "Should I display error messages on the screen? y/n -  " ANS2
+        if [ $ANS2 == "y" ]; then
+                ERRORMES="nomissingok"
+        else
+                ERRORMES="missingok"
+        fi
+
+        #Сжимать ли логи после ротации для хранения?
+        read -p "Do you want to compress logs by gzip? y/n -  " ANS3
+        if [ $ANS3 == "y" ]; then
+                COMPRESS="compress"
+        else
+                COMPRESS="nocompress"
+        fi
+
+        #Введите название директории, в которой будут храниться отротированные логи
+        read -p "Print the path to the old log dir in format /exapmle/your/old/log -  " OLDDIR
+
+        #Введите имя для созданного конфигурационного файла
+        read -p "Enter a name for your rotation config, example: myrotation -  " CONFIGNAME
+
+
+        #Проверяем корректность заданных значений
+        echo "Full path to your logfiles: $LOGPATH
+        The template for rotating logs: $TEMPLATE
+        the number of rotated log instances: $ROTATE
+        The size of logs for rotation: $SIZE
+        Creating new log file: $ANS1
+        Display error messages on the screen: $ANS2
+        Сompress logs by gzip: $ANS3
+        The path to the old log dir: $OLDDIR
+        name for your rotation config: $CONFIGNAME"
+
+        read -p "Does it correct? y/n  " ANS4
+        if [ $ANS4 == "y" ]; then
+                sudo mkdir -p $OLDDIR
+                sudo chmod 644 $OLDDIR
+                sudo touch /etc/logrotate.d/$CONFIGNAME
+                sudo echo -e "$LOGPATH/$TEMPLATE {\nrotate $ROTATE\nsize $SIZE\ndateext\nsharedscripts\n$CREATING\n$ERRORMES\n$COMPRESS\nolddir $OLDDIR\npostrotate\n   /usr/bin/systemctl restart rsyslog.service >/dev/null 2>&1 || true\nendscript\n}" > /etc/logrotate.d/$CONFIGNAME
+                logrotate /etc/logrotate.d/$CONFIGNAME
+                break
+        else
+                continue
+        fi
+done
